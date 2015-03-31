@@ -12,12 +12,12 @@
 # Needs python MySql support
 #   - apt-get install python-mysqldb
 #
-# <sub_prefix>/<domoticz_name>|<domoticz id>/0 [0|Off|1|On|2]
+# <sub_prefix>/<domoticz_name>|<domoticz_id + idx_offset>/LIGHT [0|Off|1|On|2|Toggle]
 #   turn switch off(0), on(1) or toggle(2)
-#   sido/Huis_light/0 Off
-# <sub_prefix>/<domoticz_name>|<domoticz id>/1 [0 .. 15]
+#   sido/Huis_light/LIGHT Off
+# <sub_prefix>/<domoticz_name>|<domoticz_id + idx_offset>/DIMMER [0 .. 100]
 #   dim light
-#   sido/Huis_light/1 10
+#   sido/Huis_light/DIMMER 50
 #
 # **** Start of user configuration values
 
@@ -25,14 +25,14 @@ broker = "localhost"       # MQTT broker ip address or name
 broker_port = 1883         # MQTT broker port
 
 sub_prefix = "sido"        # Own subscribe topic
-pub_prefix = "sido"        # Own publish topic or empty string for no publishing
+pub_prefix = "stat"        # Own publish topic or empty string for no publishing
 idx_offset = 2000          # Domoticz device id offset
 
 domoticz_server = "sidnas2"
 
 # **** End of user configuration values
 
-M_VERSION = "1.0"
+M_VERSION = 1.1
 
 M_INFO = 0                 # Print messages: 0 - none, 1 - Startup, 2 - Serial, 3 - All
 
@@ -55,6 +55,7 @@ def domoticzrequest(cmnd):
 def VerifyDomoticzDevice(name):
   idx = 0
   device = ""
+  subtype = ""
   if len(name) < 5:
     try:
       if int(name) > idx_offset:
@@ -71,15 +72,17 @@ def VerifyDomoticzDevice(name):
         if len(name) > 4:
           if (json_object["result"][i]["Name"] == device):
             idx = json_object["result"][i]["idx"]
+            subtype = json_object["result"][i]["SubType"]
             break
         else:
           if (json_object["result"][i]["idx"] == idx):
             device = json_object["result"][i]["Name"]
+            subtype = json_object["result"][i]["SubType"]
             break
   except:
     idx = 0
     pass
-  return (idx, device)
+  return (idx, device, subtype)
 
 def GetDomoticzDevice(idx):
   status = ""
@@ -110,7 +113,7 @@ def on_connect(client, userdata, flags, rc):
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
   my_info(2, "MQTT subscribed |"+msg.topic+"|"+str(msg.qos)+"|"+str(msg.payload)+"|")
-  part = msg.topic.split("/",3)  # sido/Werkkamer_led/0
+  part = msg.topic.split("/",3)  # sido/Werkkamer_led/LIGHT
 
 #  print(len(part), part[0], part[1], part[2])
 
@@ -124,41 +127,43 @@ def on_message(client, userdata, msg):
       except:
         pass
     if idx == 1:
-      idx, mydevice = VerifyDomoticzDevice(part[1])
+      idx, mydevice, subtype = VerifyDomoticzDevice(part[1])
 
     if idx > 0:
-      payload = msg.payload
-      mytype = ""
+      payload = msg.payload.upper()
+      mytype = part[2].upper()
 
-      if part[2] == "0":
-        if payload == "0":
+      if mytype == "LIGHT":
+        if payload == "0" or payload == "OFF":
           payload = "Off"
-        if payload == "1":
+        if payload == "1" or payload == "ON":
           payload = "On"
-        if payload == "2":
+        if payload == "2" or payload == "TOGGLE":
           if GetDomoticzDevice(idx) == "On":
             payload = "Off"
           else:
             payload = "On"
         if payload == "On" or payload == "Off":
           SetDomoticzDevice(idx, payload, 0)
-          mytype = "/V_LIGHT"
-      elif part[2] == "1":
+      elif mytype == "DIMMER":
         try:
           ipayload = int(payload)
-          if ipayload >= 0 and ipayload < 16:
-            ipayload = ipayload +1
+          if ipayload >= 0 and ipayload <= 100:
+#            if subtype == "AC":
+            ipayload = ipayload / 6
+            if ipayload < 10:
+              ipayload = ipayload +1
             SetDomoticzDevice(idx, "Set+Level", ipayload)
-            mytype = "/V_DIMMER"
         except:
           pass
+      else:
+        mytype = ""
 
-      if len(mytype) > 0 and len(pub_prefix) > 0:
+#      if len(mytype) > 0 and len(pub_prefix) > 0:
 #        mydevice = str(idx_offset + int(idx))
-        
-        mytopic = pub_prefix + "/" + mydevice + "/" + part[2] + mytype
-        my_info(2, "MQTT  published |"+mytopic+"|"+payload+"|")
-        client.publish(mytopic, payload)
+#        mytopic = pub_prefix + "/" + mydevice + "/" + mytype
+#        my_info(2, "MQTT  published |"+mytopic+"|"+payload+"|")
+#        client.publish(mytopic, payload)
 
 my_info(0, "MQTT Domoticz bridge service.")
 
@@ -179,7 +184,8 @@ while mainloop == 1:
       pass
 
   if len(pub_prefix) > 0:
-    client.publish(pub_prefix+"/"+str(idx_offset)+"/0/I_LOG_MESSAGE", "Connection with broker established.")
+#    client.publish(pub_prefix+"/"+str(idx_offset)+"/MESSAGE", "Connection with broker established.")
+    client.publish(pub_prefix+"/MQTT-Domoticz/MESSAGE", "Connection with broker established.")
 
   while rc == 0:
     try:
