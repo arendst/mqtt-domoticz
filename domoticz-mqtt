@@ -29,10 +29,10 @@ if devidx > 0:
   if avalue[:9] == "Set Level":
     part = avalue.split(" ",4)
     payload = part[2]
-    mytype = "/1/V_DIMMER"
+    mytype = "/DIMMER"
   else:
     payload = astate
-    mytype = "/0/V_LIGHT"
+    mytype = "/LIGHT"
 
 #  mydevice = str(idx_offset + int(devidx))
   mydevice = device.replace(" ","_")
