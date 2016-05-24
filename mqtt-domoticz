@@ -14,17 +14,17 @@
 #
 # <sub_prefix>/<domoticz_name>|<domoticz_id + idx_offset>/LIGHT [0|Off|1|On|2|Toggle]
 #   turn switch off(0), on(1) or toggle(2)
-#   sido/Huis_light/LIGHT Off
+#   cmnd/Huis_light/LIGHT Off
 # <sub_prefix>/<domoticz_name>|<domoticz_id + idx_offset>/DIMMER [0 .. 100]
 #   dim light
-#   sido/Huis_light/DIMMER 50
+#   cmnd/Huis_light/DIMMER 50
 #
 # **** Start of user configuration values
 
 broker = "localhost"       # MQTT broker ip address or name
 broker_port = 1883         # MQTT broker port
 
-sub_prefix = "sido"        # Own subscribe topic
+sub_prefix = "cmnd"        # Own subscribe topic
 pub_prefix = "stat"        # Own publish topic or empty string for no publishing
 idx_offset = 2000          # Domoticz device id offset
 
@@ -113,7 +113,7 @@ def on_connect(client, userdata, flags, rc):
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
   my_info(2, "MQTT subscribed |"+msg.topic+"|"+str(msg.qos)+"|"+str(msg.payload)+"|")
-  part = msg.topic.split("/",3)  # sido/Werkkamer_led/LIGHT
+  part = msg.topic.split("/",3)  # cmnd/Werkkamer_led/LIGHT
 
 #  print(len(part), part[0], part[1], part[2])
 
